@@ -461,7 +461,7 @@ class SQLQuerySuite extends QueryTest {
     }
 
     val schemaRDD1 = applySchema(rowRDD1, schema1)
-    schemaRDD1.registerAsTable("applySchema1")
+    schemaRDD1.registerTempTable("applySchema1")
     checkAnswer(
       sql("SELECT * FROM applySchema1"),
       (1, "A1", true, null) ::
@@ -491,7 +491,7 @@ class SQLQuerySuite extends QueryTest {
     }
 
     val schemaRDD2 = applySchema(rowRDD2, schema2)
-    schemaRDD2.registerAsTable("applySchema2")
+    schemaRDD2.registerTempTable("applySchema2")
     checkAnswer(
       sql("SELECT * FROM applySchema2"),
       (Seq(1, true), Map("A1" -> null)) ::
@@ -501,6 +501,25 @@ class SQLQuerySuite extends QueryTest {
 
     checkAnswer(
       sql("SELECT f1.f11, f2['D4'] FROM applySchema2"),
+      (1, null) ::
+      (2, null) ::
+      (3, null) ::
+      (4, 2147483644) :: Nil)
+
+    // The value of a MapType column can be a mutable map.
+    val rowRDD3 = unparsedStrings.map { r =>
+      val values = r.split(",").map(_.trim)
+      val v4 = try values(3).toInt catch {
+        case _: NumberFormatException => null
+      }
+      Row(Row(values(0).toInt, values(2).toBoolean), scala.collection.mutable.Map(values(1) -> v4))
+    }
+
+    val schemaRDD3 = applySchema(rowRDD3, schema2)
+    schemaRDD3.registerTempTable("applySchema3")
+
+    checkAnswer(
+      sql("SELECT f1.f11, f2['D4'] FROM applySchema3"),
       (1, null) ::
       (2, null) ::
       (3, null) ::

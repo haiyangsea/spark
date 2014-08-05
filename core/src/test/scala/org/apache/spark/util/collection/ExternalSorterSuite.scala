@@ -25,6 +25,17 @@ import org.apache.spark._
 import org.apache.spark.SparkContext._
 
 class ExternalSorterSuite extends FunSuite with LocalSparkContext {
+  private def createSparkConf(loadDefaults: Boolean): SparkConf = {
+    val conf = new SparkConf(loadDefaults)
+    // Make the Java serializer write a reset instruction (TC_RESET) after each object to test
+    // for a bug we had with bytes written past the last object in a batch (SPARK-2792)
+    conf.set("spark.serializer.objectStreamReset", "1")
+    conf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer")
+    // Ensure that we actually have multiple batches per spill file
+    conf.set("spark.shuffle.spill.batchSize", "10")
+    conf
+  }
+
   test("empty data stream") {
     val conf = new SparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
@@ -60,7 +71,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("few elements per partition") {
-    val conf = new SparkConf(false)
+    val conf = createSparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -102,7 +113,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("empty partitions with spilling") {
-    val conf = new SparkConf(false)
+    val conf = createSparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -127,7 +138,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("spilling in local cluster") {
-    val conf = new SparkConf(true)  // Load defaults, otherwise SPARK_HOME is not found
+    val conf = createSparkConf(true)  // Load defaults, otherwise SPARK_HOME is not found
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local-cluster[1,1,512]", "test", conf)
@@ -190,10 +201,15 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
         fail(s"Value 2 for ${i} was wrong: expected ${expected}, got ${seq2.toSet}")
       }
     }
+
+    // sortByKey - should spill ~17 times
+    val rddE = sc.parallelize(0 until 100000).map(i => (i/4, i))
+    val resultE = rddE.sortByKey().collect().toSeq
+    assert(resultE === (0 until 100000).map(i => (i/4, i)).toSeq)
   }
 
   test("spilling in local cluster with many reduce tasks") {
-    val conf = new SparkConf(true)  // Load defaults, otherwise SPARK_HOME is not found
+    val conf = createSparkConf(true)  // Load defaults, otherwise SPARK_HOME is not found
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local-cluster[2,1,512]", "test", conf)
@@ -256,10 +272,15 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
         fail(s"Value 2 for ${i} was wrong: expected ${expected}, got ${seq2.toSet}")
       }
     }
+
+    // sortByKey - should spill ~8 times per executor
+    val rddE = sc.parallelize(0 until 100000).map(i => (i/4, i))
+    val resultE = rddE.sortByKey().collect().toSeq
+    assert(resultE === (0 until 100000).map(i => (i/4, i)).toSeq)
   }
 
   test("cleanup of intermediate files in sorter") {
-    val conf = new SparkConf(true)  // Load defaults, otherwise SPARK_HOME is not found
+    val conf = createSparkConf(true)  // Load defaults, otherwise SPARK_HOME is not found
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -280,7 +301,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("cleanup of intermediate files in sorter if there are errors") {
-    val conf = new SparkConf(true)  // Load defaults, otherwise SPARK_HOME is not found
+    val conf = createSparkConf(true)  // Load defaults, otherwise SPARK_HOME is not found
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -301,7 +322,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("cleanup of intermediate files in shuffle") {
-    val conf = new SparkConf(false)
+    val conf = createSparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -316,7 +337,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("cleanup of intermediate files in shuffle with errors") {
-    val conf = new SparkConf(false)
+    val conf = createSparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -338,7 +359,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("no partial aggregation or sorting") {
-    val conf = new SparkConf(false)
+    val conf = createSparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -353,7 +374,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("partial aggregation without spill") {
-    val conf = new SparkConf(false)
+    val conf = createSparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -369,7 +390,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("partial aggregation with spill, no ordering") {
-    val conf = new SparkConf(false)
+    val conf = createSparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -385,7 +406,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("partial aggregation with spill, with ordering") {
-    val conf = new SparkConf(false)
+    val conf = createSparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -402,7 +423,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("sorting without aggregation, no spill") {
-    val conf = new SparkConf(false)
+    val conf = createSparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -419,7 +440,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("sorting without aggregation, with spill") {
-    val conf = new SparkConf(false)
+    val conf = createSparkConf(false)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
     sc = new SparkContext("local", "test", conf)
@@ -436,7 +457,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("spilling with hash collisions") {
-    val conf = new SparkConf(true)
+    val conf = createSparkConf(true)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     sc = new SparkContext("local-cluster[1,1,512]", "test", conf)
 
@@ -493,7 +514,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("spilling with many hash collisions") {
-    val conf = new SparkConf(true)
+    val conf = createSparkConf(true)
     conf.set("spark.shuffle.memoryFraction", "0.0001")
     sc = new SparkContext("local-cluster[1,1,512]", "test", conf)
 
@@ -516,7 +537,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("spilling with hash collisions using the Int.MaxValue key") {
-    val conf = new SparkConf(true)
+    val conf = createSparkConf(true)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     sc = new SparkContext("local-cluster[1,1,512]", "test", conf)
 
@@ -537,7 +558,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext {
   }
 
   test("spilling with null keys and values") {
-    val conf = new SparkConf(true)
+    val conf = createSparkConf(true)
     conf.set("spark.shuffle.memoryFraction", "0.001")
     sc = new SparkContext("local-cluster[1,1,512]", "test", conf)
 

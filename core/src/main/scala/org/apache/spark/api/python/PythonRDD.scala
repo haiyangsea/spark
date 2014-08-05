@@ -25,7 +25,7 @@ import java.util.{List => JList, ArrayList => JArrayList, Map => JMap, Collectio
 import scala.collection.JavaConversions._
 import scala.language.existentials
 import scala.reflect.ClassTag
-import scala.util.Try
+import scala.util.{Try, Success, Failure}
 
 import net.razorvine.pickle.{Pickler, Unpickler}
 
@@ -62,8 +62,8 @@ private[spark] class PythonRDD(
     val env = SparkEnv.get
     val localdir = env.blockManager.diskBlockManager.localDirs.map(
       f => f.getPath()).mkString(",")
-    val worker: Socket = env.createPythonWorker(pythonExec,
-      envVars.toMap + ("SPARK_LOCAL_DIR" -> localdir))
+    envVars += ("SPARK_LOCAL_DIR" -> localdir) // it's also used in monitor thread
+    val worker: Socket = env.createPythonWorker(pythonExec, envVars.toMap)
 
     // Start a thread to feed the process input from our parent's iterator
     val writerThread = new WriterThread(env, worker, split, context)
@@ -241,7 +241,7 @@ private[spark] class PythonRDD(
       if (!context.completed) {
         try {
           logWarning("Incomplete task interrupted: Attempting to kill Python Worker")
-          env.destroyPythonWorker(pythonExec, envVars.toMap)
+          env.destroyPythonWorker(pythonExec, envVars.toMap, worker)
         } catch {
           case e: Exception =>
             logError("Exception when trying to kill worker", e)
@@ -536,25 +536,6 @@ private[spark] object PythonRDD extends Logging {
     file.close()
   }
 
-  /**
-   * Convert an RDD of serialized Python dictionaries to Scala Maps (no recursive conversions).
-   * It is only used by pyspark.sql.
-   * TODO: Support more Python types.
-   */
-  def pythonToJavaMap(pyRDD: JavaRDD[Array[Byte]]): JavaRDD[Map[String, _]] = {
-    pyRDD.rdd.mapPartitions { iter =>
-      val unpickle = new Unpickler
-      iter.flatMap { row =>
-        unpickle.loads(row) match {
-          // in case of objects are pickled in batch mode
-          case objs: java.util.ArrayList[JMap[String, _] @unchecked] => objs.map(_.toMap)
-          // not in batch mode
-          case obj: JMap[String @unchecked, _] => Seq(obj.toMap)
-        }
-      }
-    }
-  }
-
   private def getMergedConf(confAsMap: java.util.HashMap[String, String],
       baseConf: Configuration): Configuration = {
     val conf = PythonHadoopUtil.mapToConf(confAsMap)
@@ -701,6 +682,53 @@ private[spark] object PythonRDD extends Logging {
     }
   }
 
+
+  /**
+   * Convert an RDD of serialized Python dictionaries to Scala Maps (no recursive conversions).
+   */
+  @deprecated("PySpark does not use it anymore", "1.1")
+  def pythonToJavaMap(pyRDD: JavaRDD[Array[Byte]]): JavaRDD[Map[String, _]] = {
+    pyRDD.rdd.mapPartitions { iter =>
+      val unpickle = new Unpickler
+      iter.flatMap { row =>
+        unpickle.loads(row) match {
+          // in case of objects are pickled in batch mode
+          case objs: JArrayList[JMap[String, _] @unchecked] => objs.map(_.toMap)
+          // not in batch mode
+          case obj: JMap[String @unchecked, _] => Seq(obj.toMap)
+        }
+      }
+    }
+  }
+
+  /**
+   * Convert an RDD of serialized Python tuple to Array (no recursive conversions).
+   * It is only used by pyspark.sql.
+   */
+  def pythonToJavaArray(pyRDD: JavaRDD[Array[Byte]], batched: Boolean): JavaRDD[Array[_]] = {
+
+    def toArray(obj: Any): Array[_] = {
+      obj match {
+        case objs: JArrayList[_] =>
+          objs.toArray
+        case obj if obj.getClass.isArray =>
+          obj.asInstanceOf[Array[_]].toArray
+      }
+    }
+
+    pyRDD.rdd.mapPartitions { iter =>
+      val unpickle = new Unpickler
+      iter.flatMap { row =>
+        val obj = unpickle.loads(row)
+        if (batched) {
+          obj.asInstanceOf[JArrayList[_]].map(toArray)
+        } else {
+          Seq(toArray(obj))
+        }
+      }
+    }.toJavaRDD()
+  }
+
   /**
    * Convert and RDD of Java objects to and RDD of serialized Python objects, that is usable by
    * PySpark.
@@ -731,19 +759,30 @@ private class PythonAccumulatorParam(@transient serverHost: String, serverPort: 
 
   val bufferSize = SparkEnv.get.conf.getInt("spark.buffer.size", 65536)
 
+  /** 
+   * We try to reuse a single Socket to transfer accumulator updates, as they are all added
+   * by the DAGScheduler's single-threaded actor anyway.
+   */ 
+  @transient var socket: Socket = _
+
+  def openSocket(): Socket = synchronized {
+    if (socket == null || socket.isClosed) {
+      socket = new Socket(serverHost, serverPort)
+    }
+    socket
+  }
+
   override def zero(value: JList[Array[Byte]]): JList[Array[Byte]] = new JArrayList
 
   override def addInPlace(val1: JList[Array[Byte]], val2: JList[Array[Byte]])
-      : JList[Array[Byte]] = {
+      : JList[Array[Byte]] = synchronized {
     if (serverHost == null) {
       // This happens on the worker node, where we just want to remember all the updates
       val1.addAll(val2)
       val1
     } else {
       // This happens on the master, where we pass the updates to Python through a socket
-      val socket = new Socket(serverHost, serverPort)
-      // SPARK-2282: Immediately reuse closed sockets because we create one per task.
-      socket.setReuseAddress(true)
+      val socket = openSocket()
       val in = socket.getInputStream
       val out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream, bufferSize))
       out.writeInt(val2.size)
@@ -757,7 +796,6 @@ private class PythonAccumulatorParam(@transient serverHost: String, serverPort: 
       if (byteRead == -1) {
         throw new SparkException("EOF reached before Python server acknowledged")
       }
-      socket.close()
       null
     }
   }
