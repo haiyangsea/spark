@@ -121,6 +121,9 @@ class DAGScheduler(
 
   private[scheduler] var eventProcessActor: ActorRef = _
 
+  /** If enabled, we may run certain actions like take() and first() locally. */
+  private val localExecutionEnabled = sc.getConf.getBoolean("spark.localExecution.enabled", false)
+
   private def initializeEventProcessActor() {
     // blocking the thread until supervisor is started, which ensures eventProcessActor is
     // not null before any job is submitted
@@ -631,7 +634,7 @@ class DAGScheduler(
         val result = job.func(taskContext, rdd.iterator(split, taskContext))
         job.listener.taskSucceeded(0, result)
       } finally {
-        taskContext.executeOnCompleteCallbacks()
+        taskContext.markTaskCompleted()
       }
     } catch {
       case e: Exception =>
@@ -732,7 +735,9 @@ class DAGScheduler(
       logInfo("Final stage: " + finalStage + "(" + finalStage.name + ")")
       logInfo("Parents of final stage: " + finalStage.parents)
       logInfo("Missing parents: " + getMissingParentStages(finalStage))
-      if (allowLocal && finalStage.parents.size == 0 && partitions.length == 1) {
+      val shouldRunLocally =
+        localExecutionEnabled && allowLocal && finalStage.parents.isEmpty && partitions.length == 1
+      if (shouldRunLocally) {
         // Compute very short actions like first() or take() with no parent stages locally.
         listenerBus.post(SparkListenerJobStart(job.jobId, Array[Int](), properties))
         runLocally(job)
@@ -883,8 +888,14 @@ class DAGScheduler(
     val task = event.task
     val stageId = task.stageId
     val taskType = Utils.getFormattedClassName(task)
-    listenerBus.post(SparkListenerTaskEnd(stageId, taskType, event.reason, event.taskInfo,
-      event.taskMetrics))
+
+    // The success case is dealt with separately below, since we need to compute accumulator
+    // updates before posting.
+    if (event.reason != Success) {
+      listenerBus.post(SparkListenerTaskEnd(stageId, taskType, event.reason, event.taskInfo,
+        event.taskMetrics))
+    }
+
     if (!stageIdToStage.contains(task.stageId)) {
       // Skip all the actions if the stage has been cancelled.
       return
@@ -904,9 +915,28 @@ class DAGScheduler(
     event.reason match {
       case Success =>
         if (event.accumUpdates != null) {
-          // TODO: fail the stage if the accumulator update fails...
-          Accumulators.add(event.accumUpdates) // TODO: do this only if task wasn't resubmitted
+          try {
+            Accumulators.add(event.accumUpdates)
+            event.accumUpdates.foreach { case (id, partialValue) =>
+              val acc = Accumulators.originals(id).asInstanceOf[Accumulable[Any, Any]]
+              // To avoid UI cruft, ignore cases where value wasn't updated
+              if (acc.name.isDefined && partialValue != acc.zero) {
+                val name = acc.name.get
+                val stringPartialValue = Accumulators.stringifyPartialValue(partialValue)
+                val stringValue = Accumulators.stringifyValue(acc.value)
+                stage.info.accumulables(id) = AccumulableInfo(id, name, stringValue)
+                event.taskInfo.accumulables +=
+                  AccumulableInfo(id, name, Some(stringPartialValue), stringValue)
+              }
+            }
+          } catch {
+            // If we see an exception during accumulator update, just log the error and move on.
+            case e: Exception =>
+              logError(s"Failed to update accumulators for $task", e)
+          }
         }
+        listenerBus.post(SparkListenerTaskEnd(stageId, taskType, event.reason, event.taskInfo,
+          event.taskMetrics))
         stage.pendingTasks -= task
         task match {
           case rt: ResultTask[_, _] =>
