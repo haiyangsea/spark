@@ -2,8 +2,6 @@ package org.apache.spark.shuffle.coflow
 
 import org.apache.spark.shuffle._
 import org.apache.spark.{Logging, TaskContext, ShuffleDependency, SparkConf}
-import org.apache.spark.storage.CoflowManager
-import varys.framework.CoflowType
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
 

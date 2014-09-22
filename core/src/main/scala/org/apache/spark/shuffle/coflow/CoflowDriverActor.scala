@@ -3,8 +3,8 @@ package org.apache.spark.shuffle.coflow
 import akka.actor.Actor
 import org.apache.spark.util.ActorLogReceive
 import org.apache.spark.{SparkConf, Logging}
-import org.apache.spark.storage.CoflowManagerMessages.GetCoflow
 import java.util.concurrent.ConcurrentHashMap
+import org.apache.spark.shuffle.coflow.CoflowManagerMessages.{RegisteredCoflow, GetCoflow}
 
 /**
  * Created by hWX221863 on 2014/9/19.

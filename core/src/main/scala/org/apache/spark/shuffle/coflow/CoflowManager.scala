@@ -4,14 +4,14 @@ import akka.actor.ActorRef
 import org.apache.spark.{SparkException, SparkConf, Logging}
 import varys.framework.client.VarysClient
 import org.apache.spark.util.AkkaUtils
-import org.apache.spark.storage.CoflowManagerMessages.{RegisteredCoflow, GetCoflow, CoflowInfo}
 import varys.framework.CoflowType.CoflowType
 import varys.framework.CoflowDescription
 import varys.VarysException
 import java.io.File
 import scala.concurrent.duration.FiniteDuration
-import java.util.concurrent.ConcurrentHashMap
 import scala.collection.mutable
+import org.apache.spark.shuffle.coflow.CoflowManagerMessages.{RegisteredCoflow, GetCoflow, CoflowInfo}
+import org.apache.spark.storage.FileSegment
 
 /**
  * Created by hWX221863 on 2014/9/19.
