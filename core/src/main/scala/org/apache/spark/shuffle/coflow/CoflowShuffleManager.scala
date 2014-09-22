@@ -4,6 +4,7 @@ import org.apache.spark.shuffle._
 import org.apache.spark.{Logging, TaskContext, ShuffleDependency, SparkConf}
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
+import varys.framework.CoflowType
 
 /**
  * Created by hWX221863 on 2014/9/22.
@@ -42,7 +43,7 @@ class CoflowShuffleManager(
     val shuffleHandle: BaseShuffleHandle[K, _, C] =
       handle.asInstanceOf[BaseShuffleHandle[K, _, C]]
     // 等待Coflow调度
-    val futures = Future.traverse(0 until shuffleHandle.numMaps)(mapId => Future {
+    val futures = Future.traverse(Range(0, shuffleHandle.numMaps).toIterator)(mapId => Future {
       coflowManager.waitBlockReady(mapId + "-" + startPartition)
     })
     Await.result(futures, Duration.Inf)
