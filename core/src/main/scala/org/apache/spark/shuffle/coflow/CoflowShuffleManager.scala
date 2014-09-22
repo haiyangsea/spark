@@ -2,9 +2,12 @@ package org.apache.spark.shuffle.coflow
 
 import org.apache.spark.shuffle._
 import org.apache.spark.{Logging, TaskContext, ShuffleDependency, SparkConf}
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{ExecutionContext, Await, Future}
 import scala.concurrent.duration.Duration
 import varys.framework.CoflowType
+import varys.Utils
+import java.util.concurrent.{ThreadFactory, Executors, ThreadPoolExecutor}
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 
 /**
  * Created by hWX221863 on 2014/9/22.
@@ -15,7 +18,9 @@ class CoflowShuffleManager(
          coflowManager: CoflowManager)
   extends ShuffleManager with Logging {
 
-  private var coflowId: String = null
+  // ExecutionContext for Futures
+  implicit val futureExecContext =
+    ExecutionContext.fromExecutor(CoflowShuffleManager.newDaemonCachedThreadPool())
 
   /* Register a shuffle with the manager and obtain a handle for it to pass to tasks. */
   override def registerShuffle[K, V, C](
@@ -25,7 +30,7 @@ class CoflowShuffleManager(
 
     val coflowName: String = "ShuffleCoflow-" + shuffleId
     val maxFlows: Int = dependency.partitioner.numPartitions * numMaps
-    coflowId = coflowManager.registerCoflow(coflowName, maxFlows, CoflowType.SHUFFLE)
+    val coflowId = coflowManager.registerCoflow(coflowName, maxFlows, CoflowType.SHUFFLE)
     logInfo("registered coflow,get id " + coflowId)
 
     baseShuffleManager.registerShuffle(shuffleId, numMaps, dependency)
@@ -82,4 +87,10 @@ class CoflowShuffleManager(
 
 object CoflowShuffleManager {
   val BLOCK_SIZE: Long = 0
+
+  private[coflow] val daemonThreadFactory: ThreadFactory =
+    new ThreadFactoryBuilder().setDaemon(true).build()
+
+  def newDaemonCachedThreadPool(): ThreadPoolExecutor =
+    Executors.newCachedThreadPool(daemonThreadFactory).asInstanceOf[ThreadPoolExecutor]
 }
