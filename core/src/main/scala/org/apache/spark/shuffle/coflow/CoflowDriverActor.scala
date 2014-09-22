@@ -1,9 +1,9 @@
-package org.apache.spark.storage
+package org.apache.spark.shuffle.coflow
 
 import akka.actor.Actor
 import org.apache.spark.util.ActorLogReceive
 import org.apache.spark.{SparkConf, Logging}
-import org.apache.spark.storage.CoflowManagerMessages.{RegisteredCoflow, GetCoflow}
+import org.apache.spark.storage.CoflowManagerMessages.GetCoflow
 import java.util.concurrent.ConcurrentHashMap
 
 /**

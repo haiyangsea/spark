@@ -38,7 +38,7 @@ import org.apache.spark.serializer.Serializer
 import org.apache.spark.shuffle.{ShuffleMemoryManager, ShuffleManager}
 import org.apache.spark.storage._
 import org.apache.spark.util.{AkkaUtils, Utils}
-import org.apache.spark.shuffle.coflow.CoflowShuffleManager
+import org.apache.spark.shuffle.coflow.{CoflowDriverActor, CoflowManager, CoflowShuffleManager}
 
 /**
  * :: DeveloperApi ::

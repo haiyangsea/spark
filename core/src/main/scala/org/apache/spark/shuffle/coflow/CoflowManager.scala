@@ -1,4 +1,4 @@
-package org.apache.spark.storage
+package org.apache.spark.shuffle.coflow
 
 import akka.actor.ActorRef
 import org.apache.spark.{SparkException, SparkConf, Logging}

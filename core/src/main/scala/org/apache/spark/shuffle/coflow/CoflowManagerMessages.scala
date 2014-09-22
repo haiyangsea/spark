@@ -1,4 +1,4 @@
-package org.apache.spark.storage
+package org.apache.spark.shuffle.coflow
 
 /**
  * Created by hWX221863 on 2014/9/19.
