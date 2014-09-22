@@ -131,6 +131,7 @@ private[spark] abstract class MapOutputTracker(conf: SparkConf) extends Logging 
       logInfo("Don't have map outputs for shuffle " + shuffleId + ", fetching them")
       var fetchedStatuses: Array[MapStatus] = null
       fetching.synchronized {
+        // TODO 为什么要在外面加一个条件判断语句，不能直接用while吗？
         if (fetching.contains(shuffleId)) {
           // Someone else is fetching it; wait for them to be done
           while (fetching.contains(shuffleId)) {

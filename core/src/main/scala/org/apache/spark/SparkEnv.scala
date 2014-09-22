@@ -38,6 +38,7 @@ import org.apache.spark.serializer.Serializer
 import org.apache.spark.shuffle.{ShuffleMemoryManager, ShuffleManager}
 import org.apache.spark.storage._
 import org.apache.spark.util.{AkkaUtils, Utils}
+import org.apache.spark.shuffle.coflow.CoflowShuffleManager
 
 /**
  * :: DeveloperApi ::
@@ -222,7 +223,17 @@ object SparkEnv extends Logging {
       "sort" -> "org.apache.spark.shuffle.sort.SortShuffleManager")
     val shuffleMgrName = conf.get("spark.shuffle.manager", "sort")
     val shuffleMgrClass = shortShuffleMgrNames.getOrElse(shuffleMgrName.toLowerCase, shuffleMgrName)
-    val shuffleManager = instantiateClass[ShuffleManager](shuffleMgrClass)
+    val baseShuffleManager = instantiateClass[ShuffleManager](shuffleMgrClass)
+
+    val shuffleManager = if(CoflowManager.useCoflow(conf)) {
+      val coflowManager: CoflowManager = new CoflowManager(registerOrLookup(
+        "CoflowDriver",
+        new CoflowDriverActor(conf)), conf, executorId, isDriver)
+
+      new CoflowShuffleManager(conf, baseShuffleManager, coflowManager)
+    } else {
+      baseShuffleManager
+    }
 
     val shuffleMemoryManager = new ShuffleMemoryManager(conf)
 
