@@ -86,7 +86,7 @@ class CoflowShuffleManager(
 }
 
 object CoflowShuffleManager {
-  val BLOCK_SIZE: Long = 0
+  val BLOCK_SIZE: Long = 1
 
   private[coflow] val daemonThreadFactory: ThreadFactory =
     new ThreadFactoryBuilder().setDaemon(true).build()
