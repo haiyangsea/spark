@@ -38,7 +38,8 @@ import org.apache.spark.serializer.Serializer
 import org.apache.spark.shuffle.{ShuffleMemoryManager, ShuffleManager}
 import org.apache.spark.storage._
 import org.apache.spark.util.{AkkaUtils, Utils}
-import org.apache.spark.shuffle.coflow.{CoflowDriverActor, CoflowManager, CoflowShuffleManager}
+import org.apache.spark.shuffle.coflow._
+import varys.framework.client.VarysClient
 
 /**
  * :: DeveloperApi ::
@@ -226,9 +227,16 @@ object SparkEnv extends Logging {
     val baseShuffleManager = instantiateClass[ShuffleManager](shuffleMgrClass)
 
     val shuffleManager = if(CoflowManager.useCoflow(conf)) {
-      val coflowManager: CoflowManager = new CoflowManager(registerOrLookup(
-        "CoflowDriver",
-        new CoflowDriverActor(conf)), conf, executorId, isDriver)
+      val varysMaster: String = CoflowManager.getCoflowMasterUrl(conf)
+      val varysClient: VarysClient = new VarysClient(executorId, varysMaster, new CoflowClientListener)
+      varysClient.start()
+      // initialize coflow manager master or coflow manager slave according to whether it is at driver side
+      val coflowManager: CoflowManager = if(isDriver) {
+        new CoflowManagerMaster(actorSystem, varysClient, conf)
+      } else {
+        val driverActor = AkkaUtils.makeDriverRef(CoflowManagerMaster.DriverActorName, conf, actorSystem)
+        new CoflowManagerSlave(driverActor, varysClient, conf)
+      }
 
       new CoflowShuffleManager(conf, baseShuffleManager, coflowManager)
     } else {
