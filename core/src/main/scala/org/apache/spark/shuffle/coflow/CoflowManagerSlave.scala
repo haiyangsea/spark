@@ -19,7 +19,7 @@ class CoflowManagerSlave(driverActor: ActorRef, varysClient: VarysClient, conf: 
   val timeout = AkkaUtils.askTimeout(conf)
 
   override def getCoflowId(shuffleId: Int): String = {
-    val coflowInfo: CoflowInfo = AkkaUtils.askWithReply[CoflowInfo](GetCoflowInfo,
+    val coflowInfo: CoflowInfo = AkkaUtils.askWithReply[CoflowInfo](GetCoflowInfo(shuffleId),
       driverActor,
       AKKA_RETRY_ATTEMPTS,
       AKKA_RETRY_INTERVAL_MS,
