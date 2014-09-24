@@ -10,7 +10,10 @@ import org.apache.spark.SparkConf
 /**
  * Created by hWX221863 on 2014/9/24.
  */
-abstract class CoflowManager(varysClient: VarysClient) {
+abstract class CoflowManager(clientName: String, conf: SparkConf) {
+  val varysMaster: String = CoflowManager.getCoflowMasterUrl(conf)
+  val varysClient: VarysClient = new VarysClient(clientName, varysMaster, new CoflowClientListener)
+  varysClient.start()
 
   def getCoflowId(shuffleId: Int): String
 
@@ -62,6 +65,8 @@ abstract class CoflowManager(varysClient: VarysClient) {
 private[spark] object CoflowManager {
   val CoflowEnableConfig = "spark.use.coflow"
   val CoflowMasterConfig = "spark.coflow.master"
+  // Fake Block Size
+  val BLOCK_SIZE: Long = 1
 
   def getCoflowMasterUrl(conf: SparkConf): String = {
     val defaultMaster: String = "varys://" + conf.get("spark.driver.host", "localhost") + ":1606"
@@ -70,5 +75,13 @@ private[spark] object CoflowManager {
 
   def useCoflow(conf: SparkConf): Boolean = {
     conf.getBoolean(CoflowEnableConfig, false)
+  }
+
+  def makeBlockId(mapId: Int, reduceId: Int): String = {
+    "shuffle_" + mapId + "_" + reduceId
+  }
+
+  def makeCoflowName(shuffleId: Int, conf: SparkConf): String = {
+    conf.get("spark.app.name") + "-Shuffle[" + shuffleId + "]-Coflow"
   }
 }

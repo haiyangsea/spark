@@ -227,17 +227,13 @@ object SparkEnv extends Logging {
     val baseShuffleManager = instantiateClass[ShuffleManager](shuffleMgrClass)
 
     val shuffleManager = if(CoflowManager.useCoflow(conf)) {
-      val varysMaster: String = CoflowManager.getCoflowMasterUrl(conf)
-      val varysClient: VarysClient = new VarysClient(executorId, varysMaster, new CoflowClientListener)
-      varysClient.start()
       // initialize coflow manager master or coflow manager slave according to whether it is at driver side
       val coflowManager: CoflowManager = if(isDriver) {
-        new CoflowManagerMaster(actorSystem, varysClient, conf)
+        new CoflowManagerMaster(actorSystem, conf)
       } else {
         val driverActor = AkkaUtils.makeDriverRef(CoflowManagerMaster.DriverActorName, conf, actorSystem)
-        new CoflowManagerSlave(driverActor, varysClient, conf)
+        new CoflowManagerSlave(driverActor, executorId, conf)
       }
-
       new CoflowShuffleManager(conf, baseShuffleManager, coflowManager)
     } else {
       baseShuffleManager

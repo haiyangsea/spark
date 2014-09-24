@@ -17,9 +17,8 @@ import scala.concurrent.Await
 private[spark]
 class CoflowManagerMaster(
     actorSystem: ActorSystem,
-    varysClient: VarysClient,
     conf: SparkConf)
-  extends CoflowManager(varysClient) with Logging {
+  extends CoflowManager("Driver", conf) with Logging {
 
   private val shuffleCoflowPair: mutable.HashMap[Int, String] =
     new mutable.HashMap[Int, String]()

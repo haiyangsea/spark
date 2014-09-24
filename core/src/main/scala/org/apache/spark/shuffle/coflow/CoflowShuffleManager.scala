@@ -24,7 +24,7 @@ class CoflowShuffleManager(
        numMaps: Int,
        dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
 
-    val coflowName: String = "ShuffleCoflow-" + shuffleId
+    val coflowName: String = CoflowManager.makeCoflowName(shuffleId, conf)
     val maxFlows: Int = dependency.partitioner.numPartitions * numMaps
     val coflowId = coflowManager.registerCoflow(shuffleId, coflowName, maxFlows, CoflowType.SHUFFLE)
     logInfo("registered coflow,get id " + coflowId)
@@ -45,7 +45,7 @@ class CoflowShuffleManager(
       handle.asInstanceOf[BaseShuffleHandle[K, _, C]]
     // 等待Coflow调度
     val futures = Future.traverse(Range(0, shuffleHandle.numMaps).toIterator)(mapId => Future {
-      val blockId = CoflowShuffleManager.makeBlockId(mapId, startPartition)
+      val blockId = CoflowManager.makeBlockId(mapId, startPartition)
       coflowManager.waitBlockReady(handle.shuffleId, blockId)
     })
     Await.result(futures, Duration.Inf)
@@ -60,8 +60,8 @@ class CoflowShuffleManager(
       handle.asInstanceOf[BaseShuffleHandle[K, V, _]]
     // 在Coflow中注册Map/Reduce结果
     (0 until shuffleHandle.dependency.partitioner.numPartitions).foreach(reduceId => {
-      val blockId = CoflowShuffleManager.makeBlockId(mapId, reduceId)
-      coflowManager.putBlock(handle.shuffleId, blockId, CoflowShuffleManager.BLOCK_SIZE, 1)
+      val blockId = CoflowManager.makeBlockId(mapId, reduceId)
+      coflowManager.putBlock(handle.shuffleId, blockId, CoflowManager.BLOCK_SIZE, 1)
     })
 
     baseShuffleManager.getWriter(handle, mapId, context)
@@ -81,13 +81,5 @@ class CoflowShuffleManager(
   override def stop(): Unit = {
     coflowManager.stop()
     baseShuffleManager.stop()
-  }
-}
-
-object CoflowShuffleManager {
-  val BLOCK_SIZE: Long = 1
-
-  def makeBlockId(mapId: Int, reduceId: Int): String = {
-    "shuffle_" + mapId + "_" + reduceId
   }
 }

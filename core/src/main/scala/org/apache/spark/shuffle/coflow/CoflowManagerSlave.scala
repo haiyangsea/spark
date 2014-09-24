@@ -12,14 +12,15 @@ import org.apache.spark.shuffle.coflow.CoflowManagerMessages.GetCoflowInfo
 /**
  * Created by hWX221863 on 2014/9/24.
  */
-class CoflowManagerSlave(driverActor: ActorRef, varysClient: VarysClient, conf: SparkConf)
-  extends CoflowManager(varysClient) {
+class CoflowManagerSlave(driverActor: ActorRef, executorId: String, conf: SparkConf)
+  extends CoflowManager("Executor-" +executorId, conf) {
   private val AKKA_RETRY_ATTEMPTS: Int = AkkaUtils.numRetries(conf)
   private val AKKA_RETRY_INTERVAL_MS: Int = AkkaUtils.retryWaitMs(conf)
   val timeout = AkkaUtils.askTimeout(conf)
 
   override def getCoflowId(shuffleId: Int): String = {
-    val coflowInfo: CoflowInfo = AkkaUtils.askWithReply[CoflowInfo](GetCoflowInfo(shuffleId),
+    val coflowInfo: CoflowInfo = AkkaUtils.askWithReply[CoflowInfo](
+      GetCoflowInfo(shuffleId),
       driverActor,
       AKKA_RETRY_ATTEMPTS,
       AKKA_RETRY_INTERVAL_MS,
