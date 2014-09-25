@@ -8,6 +8,7 @@ import org.apache.spark.shuffle.coflow.CoflowManagerMessages.{GetCoflowInfo, Cof
 import varys.framework.CoflowType._
 import org.apache.spark.shuffle.coflow.CoflowManagerMessages.CoflowInfo
 import org.apache.spark.shuffle.coflow.CoflowManagerMessages.GetCoflowInfo
+import scala.collection.mutable
 
 /**
  * Created by hWX221863 on 2014/9/24.
@@ -18,7 +19,18 @@ class CoflowManagerSlave(driverActor: ActorRef, executorId: String, conf: SparkC
   private val AKKA_RETRY_INTERVAL_MS: Int = AkkaUtils.retryWaitMs(conf)
   val timeout = AkkaUtils.askTimeout(conf)
 
+  private val shuffleToCoflow: mutable.HashMap[Int, String] =
+    new mutable.HashMap[Int, String]
+
   override def getCoflowId(shuffleId: Int): String = {
+    shuffleToCoflow.getOrElse(shuffleId, {
+      val coflowId: String = fetchCoflowId(shuffleId)
+      shuffleToCoflow += shuffleId -> coflowId
+      coflowId
+    })
+  }
+
+  private def fetchCoflowId(shuffleId: Int): String = {
     val coflowInfo: CoflowInfo = AkkaUtils.askWithReply[CoflowInfo](
       GetCoflowInfo(shuffleId),
       driverActor,

@@ -10,9 +10,14 @@ import org.apache.spark.SparkConf
 /**
  * Created by hWX221863 on 2014/9/24.
  */
-abstract class CoflowManager(clientName: String, conf: SparkConf) {
+abstract class CoflowManager(executorId: String, conf: SparkConf) {
   val varysMaster: String = CoflowManager.getCoflowMasterUrl(conf)
-  val varysClient: VarysClient = new VarysClient(clientName, varysMaster, new CoflowClientListener)
+  val clientName: String = conf.get("spark.app.name", "") + "-" + executorId
+  val varysClient: VarysClient = new VarysClient(
+                                      clientName,
+                                      varysMaster,
+                                      new CoflowClientListener)
+  
   varysClient.start()
 
   def getCoflowId(shuffleId: Int): String

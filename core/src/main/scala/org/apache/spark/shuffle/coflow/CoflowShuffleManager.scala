@@ -6,8 +6,6 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
 import varys.framework.CoflowType
 import scala.concurrent.ExecutionContext.Implicits.global
-import java.util.concurrent.{ThreadFactory, Executors, ThreadPoolExecutor}
-import com.google.common.util.concurrent.ThreadFactoryBuilder
 
 /**
  * Created by hWX221863 on 2014/9/22.
@@ -46,6 +44,7 @@ class CoflowShuffleManager(
     // 等待Coflow调度
     val futures = Future.traverse(Range(0, shuffleHandle.numMaps).toIterator)(mapId => Future {
       val blockId = CoflowManager.makeBlockId(mapId, startPartition)
+      logDebug(s"wait block[$blockId] ready...")
       coflowManager.waitBlockReady(handle.shuffleId, blockId)
     })
     Await.result(futures, Duration.Inf)
