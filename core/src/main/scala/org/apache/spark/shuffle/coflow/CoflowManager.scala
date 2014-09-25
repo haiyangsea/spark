@@ -5,7 +5,7 @@ import java.io.File
 import org.apache.spark.storage.FileSegment
 import varys.VarysException
 import varys.framework.CoflowType._
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkException, SparkConf}
 
 /**
  * Created by hWX221863 on 2014/9/24.
@@ -55,6 +55,17 @@ abstract class CoflowManager(executorId: String, conf: SparkConf) {
   def getFile(shuffleId: Int, fileId: String): Array[Byte] = {
     val coflowId: String = getCoflowId(shuffleId)
     varysClient.getFile(fileId, coflowId)
+  }
+
+  def getBlock(blockId: String): Array[Byte] = {
+    val shuffleBlockId = """shuffle_(\d+)_(\d+)_(\d+)""".r
+    blockId match {
+      case shuffleBlockId(shuffleId, mapId, reduceId) =>
+        getFile(shuffleId.toInt, blockId)
+
+      case _ =>
+        throw new SparkException("The input block id[$blockId] is not shuffle block id!")
+    }
   }
 
   private def putFile(coflowId: String,
