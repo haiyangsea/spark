@@ -35,8 +35,9 @@ class CoflowShuffleWriter[K, V](
     // 在Coflow中注册Map/Reduce结果
     (0 until reduceCount).foreach(reduceId => {
       val blockId = ShuffleBlockId(handle.shuffleId, mapId, reduceId)
-      val fileSegment: FileSegment = getFileSegment(blockId: ShuffleBlockId)
-      coflowManager.putFile(handle.shuffleId, blockId.name, fileSegment, reduceCount)
+      val fileSegment: FileSegment = getFileSegment(blockId)
+      val fileId: String = CoflowManager.makeFileId(blockId)
+      coflowManager.putFile(handle.shuffleId, fileId, fileSegment, reduceCount)
     })
     shuffleWriterHandler.stop(success)
   }

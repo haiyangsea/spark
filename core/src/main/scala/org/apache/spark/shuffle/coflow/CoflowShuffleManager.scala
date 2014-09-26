@@ -2,11 +2,9 @@ package org.apache.spark.shuffle.coflow
 
 import org.apache.spark.shuffle._
 import org.apache.spark.{Logging, TaskContext, ShuffleDependency, SparkConf}
-import scala.concurrent.{ExecutionContext, Await, Future}
-import scala.concurrent.duration.Duration
+import scala.concurrent.ExecutionContext
 import varys.framework.CoflowType
-import java.util.concurrent.{ThreadFactory, ThreadPoolExecutor, Executors}
-import com.google.common.util.concurrent.ThreadFactoryBuilder
+import org.apache.spark.util.Utils
 
 /**
  * Created by hWX221863 on 2014/9/22.
@@ -16,9 +14,6 @@ class CoflowShuffleManager(
          baseShuffleManager: ShuffleManager,
          coflowManager: CoflowManager)
   extends ShuffleManager with Logging {
-
-  // ExecutionContext for Futures
-  implicit val futureExecContext = ExecutionContext.fromExecutor(CoflowShuffleManager.newDaemonCachedThreadPool())
 
   /* Register a shuffle with the manager and obtain a handle for it to pass to tasks. */
   override def registerShuffle[K, V, C](
@@ -45,15 +40,7 @@ class CoflowShuffleManager(
       context: TaskContext): ShuffleReader[K, C] = {
     val shuffleHandle: BaseShuffleHandle[K, _, C] =
       handle.asInstanceOf[BaseShuffleHandle[K, _, C]]
-    // 等待Coflow调度
-    val futures = Future.traverse(Range(0, shuffleHandle.numMaps).toIterator)(mapId => Future {
-      val blockId = CoflowManager.makeBlockId(mapId, startPartition)
-      logDebug(s"wait block[$blockId] ready...")
-      coflowManager.waitBlockReady(handle.shuffleId, blockId)
-    })
-    Await.result(futures, Duration.Inf)
-
-    baseShuffleManager.getReader(handle, startPartition, endPartition, context)
+    new CoflowShuffleReader(shuffleHandle, startPartition, endPartition, context, coflowManager)
   }
 
   /** Get a writer for a given partition. Called on executors by map tasks. */
@@ -61,13 +48,7 @@ class CoflowShuffleManager(
       : ShuffleWriter[K, V] = {
     val shuffleHandle: BaseShuffleHandle[K, V, _] =
       handle.asInstanceOf[BaseShuffleHandle[K, V, _]]
-    // 在Coflow中注册Map/Reduce结果
-    (0 until shuffleHandle.dependency.partitioner.numPartitions).foreach(reduceId => {
-      val blockId = CoflowManager.makeBlockId(mapId, reduceId)
-      coflowManager.putBlock(handle.shuffleId, blockId, CoflowManager.BLOCK_SIZE, 1)
-    })
-
-    baseShuffleManager.getWriter(handle, mapId, context)
+    new CoflowShuffleWriter(mapId, shuffleHandle, context, coflowManager, baseShuffleManager)
   }
 
   /** Remove a shuffle's metadata from the ShuffleManager. */
@@ -84,14 +65,5 @@ class CoflowShuffleManager(
   override def stop(): Unit = {
     coflowManager.stop()
     baseShuffleManager.stop()
-  }
-}
-
-object CoflowShuffleManager {
-  val daemonThreadFactory: ThreadFactory =
-    new ThreadFactoryBuilder().setDaemon(true).build()
-
-  def newDaemonCachedThreadPool() = {
-    Executors.newCachedThreadPool(daemonThreadFactory).asInstanceOf[ThreadPoolExecutor]
   }
 }

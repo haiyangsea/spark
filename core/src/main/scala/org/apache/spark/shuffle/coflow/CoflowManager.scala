@@ -2,10 +2,11 @@ package org.apache.spark.shuffle.coflow
 
 import varys.framework.client.VarysClient
 import java.io.File
-import org.apache.spark.storage.FileSegment
+import org.apache.spark.storage.{ShuffleBlockId, FileSegment}
 import varys.VarysException
 import varys.framework.CoflowType._
 import org.apache.spark.{SparkException, SparkConf}
+import org.apache.spark.storage.ShuffleBlockId
 
 /**
  * Created by hWX221863 on 2014/9/24.
@@ -93,8 +94,12 @@ private[spark] object CoflowManager {
     conf.getBoolean(CoflowEnableConfig, false)
   }
 
-  def makeBlockId(mapId: Int, reduceId: Int): String = {
-    "shuffle_" + mapId + "_" + reduceId
+  def makeFileId(shuffleId: Int, mapId: Int, reduceId: Int): String = {
+    ShuffleBlockId(shuffleId, mapId, reduceId).name
+  }
+
+  def makeFileId(shuffleBlockId: ShuffleBlockId): String = {
+    shuffleBlockId.name
   }
 
   def makeCoflowName(shuffleId: Int, conf: SparkConf): String = {
