@@ -73,7 +73,11 @@ class CoflowManagerMaster(
 
   def unregisterCoflow(shuffleId: Int) {
     val coflowId: Option[String] = shuffleCoflowPair.get(shuffleId)
-    coflowId.foreach(id => varysClient.unregisterCoflow(id))
+    coflowId.foreach(id => {
+      varysClient.unregisterCoflow(id)
+      logInfo(s"coflow[id = $id] has been unregistered!")
+    })
+
   }
 
   override def getCoflowId(shuffleId: Int): String = {

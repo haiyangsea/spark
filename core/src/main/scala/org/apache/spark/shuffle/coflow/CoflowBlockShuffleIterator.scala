@@ -63,7 +63,9 @@ private[spark] class CoflowBlockShuffleIterator(
 
   def next(): Iterator[Any] = {
     numBlocksProcessed += 1
-    logInfo("fetch shuffle block %d time(s), total %d.".format(numBlocksProcessed, numBlocksToFetch))
+    logInfo("fetch shuffle[shuffle id = %d, reduce id = %d] block %d time(s), total %d."
+      .format(shuffleId, reduceId, numBlocksProcessed, numBlocksToFetch))
+
     val startFetchWait = System.currentTimeMillis()
     val block = blocks.take()
     val stopFetchWait = System.currentTimeMillis()
