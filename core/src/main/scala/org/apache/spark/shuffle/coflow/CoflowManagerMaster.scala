@@ -2,13 +2,12 @@ package org.apache.spark.shuffle.coflow
 
 import akka.actor.{Props, ActorSystem, Actor, ActorRef}
 import org.apache.spark.{SparkException, SparkConf, Logging}
-import varys.framework.client.VarysClient
 import org.apache.spark.util.{ActorLogReceive, AkkaUtils}
 import varys.framework.CoflowType.CoflowType
 import varys.framework.CoflowDescription
 import scala.collection.mutable
 import org.apache.spark.shuffle.coflow.CoflowManagerMessages._
-import java.util.concurrent.{TimeoutException}
+import java.util.concurrent.TimeoutException
 import scala.concurrent.Await
 
 /**

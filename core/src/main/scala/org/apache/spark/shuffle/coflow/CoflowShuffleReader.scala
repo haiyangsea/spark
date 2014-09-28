@@ -1,7 +1,7 @@
 package org.apache.spark.shuffle.coflow
 
 import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleReader}
-import org.apache.spark.{SparkEnv, InterruptibleIterator, TaskContext}
+import org.apache.spark.{InterruptibleIterator, TaskContext}
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.util.collection.ExternalSorter
 

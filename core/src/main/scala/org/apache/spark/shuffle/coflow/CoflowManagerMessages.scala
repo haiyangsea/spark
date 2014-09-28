@@ -1,7 +1,5 @@
 package org.apache.spark.shuffle.coflow
 
-import varys.framework.CoflowType._
-
 /**
  * Created by hWX221863 on 2014/9/19.
  */

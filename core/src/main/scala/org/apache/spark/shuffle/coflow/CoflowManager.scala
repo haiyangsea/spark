@@ -2,8 +2,7 @@ package org.apache.spark.shuffle.coflow
 
 import varys.framework.client.VarysClient
 import java.io.File
-import org.apache.spark.storage.{ShuffleBlockId, FileSegment}
-import varys.VarysException
+import org.apache.spark.storage.FileSegment
 import varys.framework.CoflowType._
 import org.apache.spark.{SparkException, SparkConf}
 import org.apache.spark.storage.ShuffleBlockId

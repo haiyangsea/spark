@@ -2,9 +2,7 @@ package org.apache.spark.shuffle.coflow
 
 import org.apache.spark.shuffle._
 import org.apache.spark.{Logging, TaskContext, ShuffleDependency, SparkConf}
-import scala.concurrent.ExecutionContext
 import varys.framework.CoflowType
-import org.apache.spark.util.Utils
 
 /**
  * Created by hWX221863 on 2014/9/22.
@@ -38,8 +36,7 @@ class CoflowShuffleManager(
       startPartition: Int,
       endPartition: Int,
       context: TaskContext): ShuffleReader[K, C] = {
-    val shuffleHandle: BaseShuffleHandle[K, _, C] =
-      handle.asInstanceOf[BaseShuffleHandle[K, _, C]]
+    val shuffleHandle = handle.asInstanceOf[BaseShuffleHandle[K, _, C]]
     new CoflowShuffleReader(shuffleHandle, startPartition, endPartition, context, coflowManager)
   }
 

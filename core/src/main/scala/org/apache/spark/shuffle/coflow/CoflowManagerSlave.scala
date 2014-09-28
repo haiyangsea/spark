@@ -1,10 +1,8 @@
 package org.apache.spark.shuffle.coflow
 
 import akka.actor.ActorRef
-import varys.framework.client.VarysClient
 import org.apache.spark.util.AkkaUtils
 import org.apache.spark.SparkConf
-import org.apache.spark.shuffle.coflow.CoflowManagerMessages.{GetCoflowInfo, CoflowInfo}
 import varys.framework.CoflowType._
 import org.apache.spark.shuffle.coflow.CoflowManagerMessages.CoflowInfo
 import org.apache.spark.shuffle.coflow.CoflowManagerMessages.GetCoflowInfo

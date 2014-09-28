@@ -1,15 +1,11 @@
 package org.apache.spark.shuffle.coflow
 
-import org.apache.spark.{Logging, TaskKilledException, TaskContext}
-import org.apache.spark.storage.{ShuffleBlockId, BlockId, BlockManager}
-import java.util.concurrent.{ThreadFactory, Executors, ThreadPoolExecutor, LinkedBlockingQueue}
-import org.apache.spark.network.{NioByteBufferManagedBuffer, ManagedBuffer}
-import scala.concurrent.{ExecutionContext, Future}
+import org.apache.spark.{Logging, TaskContext}
+import org.apache.spark.storage.{ShuffleBlockId, BlockManager}
+import java.util.concurrent.{Executors, LinkedBlockingQueue}
+import org.apache.spark.network.NioByteBufferManagedBuffer
 import java.nio.ByteBuffer
 import org.apache.spark.serializer.Serializer
-import org.apache.spark.util.Utils
-import java.util.concurrent.atomic.AtomicInteger
-import com.google.common.util.concurrent.ThreadFactoryBuilder
 
 /**
  * Created by hWX221863 on 2014/9/26.
@@ -33,7 +29,7 @@ private[spark] class CoflowBlockShuffleIterator(
   private[this] val threadPool = Executors.newCachedThreadPool()
 
   initialize()
-
+  // TODO add metrics
   private[this] def initialize() {
     blockMapIdsAndSize.map(block => block._2).foreach(mapId => {
       // create a fetch block data task
@@ -50,6 +46,7 @@ private[spark] class CoflowBlockShuffleIterator(
           }
         }
       }
+      logInfo(s"start to fetch block[shuffle id = $shuffleId, map id = $mapId, reduce id = $reduceId] data.")
       // submit task to fetch data and put it into blocks queue
       threadPool.submit(blockFetcher)
     })
