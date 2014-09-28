@@ -30,24 +30,31 @@ private[spark] class CoflowBlockShuffleIterator(
   private[this] val blocks = new LinkedBlockingQueue[Iterator[Any]]
   private[this] val shuffleMetrics = context.taskMetrics.createShuffleReadMetricsForDependency()
 
-  implicit val futureExecFuture =
-    ExecutionContext.fromExecutor(CoflowBlockShuffleIterator.newDaemonCachedThreadPool())
+  private[this] val threadPool = Executors.newCachedThreadPool()
 
   initialize()
 
   private[this] def initialize() {
     blockMapIdsAndSize.map(block => block._2).foreach(mapId => {
-      Future {
-        val dataBuffer: ByteBuffer = fetchBlock(mapId)
-        if(dataBuffer.array().length > 0) {
-          val managedBuffer = new NioByteBufferManagedBuffer(dataBuffer)
-          val blockIterator = serializer.newInstance().deserializeStream(
-            blockManager.wrapForCompression(ShuffleBlockId(shuffleId, mapId, reduceId),
-              managedBuffer.inputStream())).asIterator
-          blocks.put(blockIterator)
+      // create a fetch block data task
+      val blockFetcher = new Runnable {
+        override def run(): Unit = {
+          val dataBuffer: ByteBuffer = fetchBlock(mapId)
+          logDebug(s"get block[shuffle id = $shuffleId, map id = $mapId, reduce id = $reduceId] data.")
+          if(dataBuffer.array().length > 0) {
+            val managedBuffer = new NioByteBufferManagedBuffer(dataBuffer)
+            val blockIterator = serializer.newInstance().deserializeStream(
+              blockManager.wrapForCompression(ShuffleBlockId(shuffleId, mapId, reduceId),
+                managedBuffer.inputStream())).asIterator
+            blocks.put(blockIterator)
+          }
         }
       }
+      // submit task to fetch data and put it into blocks queue
+      threadPool.submit(blockFetcher)
     })
+
+    threadPool.shutdown()
   }
 
   private[this] def fetchBlock(mapId: Int): ByteBuffer = {
@@ -72,13 +79,4 @@ private[spark] class CoflowBlockShuffleIterator(
     shuffleMetrics.fetchWaitTime += (stopFetchWait - startFetchWait)
     block
   }
-}
-
-object CoflowBlockShuffleIterator {
-  // TODO 检查用Spark Util中生成的futureContext为何会容易达到瓶颈
-  private[this] val daemonThreadFactory: ThreadFactory =
-    new ThreadFactoryBuilder().setDaemon(true).build()
-
-  def newDaemonCachedThreadPool(): ThreadPoolExecutor =
-    Executors.newCachedThreadPool(daemonThreadFactory).asInstanceOf[ThreadPoolExecutor]
 }

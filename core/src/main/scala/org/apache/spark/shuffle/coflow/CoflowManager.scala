@@ -81,21 +81,14 @@ abstract class CoflowManager(executorId: String, conf: SparkConf) {
 
 private[spark] object CoflowManager {
   val CoflowMasterConfig = "spark.coflow.master"
-  // Fake Block Size
-  val BLOCK_SIZE: Long = 1
-  private[this] var coflowMaster = null
 
   def getCoflowMasterUrl(conf: SparkConf): String = {
     val defaultMaster: String = "varys://" + conf.get("spark.driver.host", "localhost") + ":1606"
-    coflowMaster = if(coflowMaster == null )
-      conf.get(CoflowMasterConfig, defaultMaster)
-    else
-      coflowMaster
+    conf.get(CoflowMasterConfig, defaultMaster)
   }
 
   def useCoflow(conf: SparkConf): Boolean = {
-    coflowMaster = conf.get(CoflowMasterConfig, null)
-    coflowMaster != null
+    conf.get(CoflowMasterConfig, null) != null
   }
 
   def makeFileId(shuffleId: Int, mapId: Int, reduceId: Int): String = {
