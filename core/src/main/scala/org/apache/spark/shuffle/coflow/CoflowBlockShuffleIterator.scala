@@ -53,7 +53,7 @@ private[spark] class CoflowBlockShuffleIterator(
       // submit task to fetch data and put it into blocks queue
       threadPool.submit(blockFetcher)
     })
-
+    // when all block data fetch over, the pool will be closed
     threadPool.shutdown()
   }
 
