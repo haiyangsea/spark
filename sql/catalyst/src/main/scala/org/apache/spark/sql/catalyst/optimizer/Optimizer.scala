@@ -362,6 +362,21 @@ object SimplifyFilters extends Rule[LogicalPlan] {
     case Filter(Literal(null, _), child) => LocalRelation(child.output, data = Seq.empty)
     case Filter(Literal(false, BooleanType), child) => LocalRelation(child.output, data = Seq.empty)
   }
+
+  def combineOrComparison(left: BinaryComparison, right: BinaryComparison): Expression = {
+    if (!left.left.fastEquals(right.left)) {
+      Or(left, right)
+    } else {
+      left match {
+        case LessThan(attr, Literal(value, t : NativeType)) =>
+          if (right.isInstanceOf[LessThanOrEqual]) {
+          // TODO add code
+        }
+
+      }
+    }
+    null
+  }
 }
 
 /**
