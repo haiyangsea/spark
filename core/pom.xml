@@ -291,7 +291,7 @@
     <dependency>
       <groupId>net.varys</groupId>
       <artifactId>varys-core_${scala.binary.version}</artifactId>
-      <version>0.2.0-SNAPSHOT</version>
+      <version>0.3.0-SNAPSHOT</version>
       <exclusions>
           <exclusion>
               <groupId>com.typesafe.akka</groupId>
@@ -299,7 +299,7 @@
           </exclusion>
           <exclusion>
               <groupId>com.typesafe.akka</groupId>
-              <artifactId>akka-remote_2.10</artifactId>
+              <artifactId>akka-actor_2.10</artifactId>
           </exclusion>
           <exclusion>
               <groupId>com.typesafe.akka</groupId>

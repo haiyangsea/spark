@@ -23,6 +23,7 @@ import org.apache.spark.storage.FileSegment
 import varys.framework.CoflowType._
 import org.apache.spark.{SparkException, SparkConf}
 import org.apache.spark.storage.ShuffleBlockId
+import varys.framework.network.FlowFetchListener
 
 /**
  * Created by hWX221863 on 2014/9/24.
@@ -54,11 +55,6 @@ abstract class CoflowManager(executorId: String, conf: SparkConf) {
     varysClient.putFake(blockId, coflowId, size, numReceivers)
   }
 
-  def waitBlockReady(shuffleId: Int, blockId: String) {
-    val coflowId: String = getCoflowId(shuffleId)
-    varysClient.getFake(blockId, coflowId)
-  }
-
   def putFile(shuffleId: Int, fileId: String, file: File, numReceivers: Int) {
     val coflowId: String = getCoflowId(shuffleId)
     putFile(coflowId, fileId, file.getAbsolutePath, 0, file.length(), numReceivers)
@@ -69,20 +65,9 @@ abstract class CoflowManager(executorId: String, conf: SparkConf) {
     putFile(coflowId, fileId, file.file.getAbsolutePath, file.offset, file.length, numReceivers)
   }
 
-  def getFile(shuffleId: Int, fileId: String): Array[Byte] = {
-    val coflowId: String = getCoflowId(shuffleId)
-    varysClient.getFile(fileId, coflowId)
-  }
-
-  def getBlock(blockId: String): Array[Byte] = {
-    val shuffleBlockId = """shuffle_(\d+)_(\d+)_(\d+)""".r
-    blockId match {
-      case shuffleBlockId(shuffleId, mapId, reduceId) =>
-        getFile(shuffleId.toInt, blockId)
-
-      case _ =>
-        throw new SparkException("The input block id[$blockId] is not shuffle block id!")
-    }
+  def getFlows(shuffleId: Int, flows: Seq[String], listener: FlowFetchListener): Unit = {
+    val coflowId = getCoflowId(shuffleId)
+    varysClient.getFlows(flows, coflowId, listener)
   }
 
   private def putFile(coflowId: String,
@@ -109,6 +94,16 @@ private[spark] object CoflowManager {
 
   def makeFileId(shuffleId: Int, mapId: Int, reduceId: Int): String = {
     ShuffleBlockId(shuffleId, mapId, reduceId).name
+  }
+
+  def getBlockId(flowId: String): ShuffleBlockId = {
+    val blockPatten = "shuffle_(\\d)_(\\d)_(\\d)".r
+    flowId match {
+      case blockPatten(shuffleId, mapId, reduceId) =>
+        ShuffleBlockId(shuffleId.toInt, mapId.toInt, reduceId.toInt)
+      case _ =>
+        sys.error("Flow id in wrong format,can not be converted to shuffle block id!")
+    }
   }
 
   def makeFileId(shuffleBlockId: ShuffleBlockId): String = {
