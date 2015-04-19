@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.spark.shuffle.coflow
 
 import org.apache.spark.{Logging, TaskContext}
@@ -36,7 +53,8 @@ private[spark] class CoflowBlockShuffleIterator(
       val blockFetcher = new Runnable {
         override def run(): Unit = {
           val dataBuffer: ByteBuffer = fetchBlock(mapId)
-          logDebug(s"get block[shuffle id = $shuffleId, map id = $mapId, reduce id = $reduceId] data.")
+          logDebug(s"get block[shuffle id = $shuffleId, " +
+            s"map id = $mapId, reduce id = $reduceId] data.")
           if(dataBuffer.array().length > 0) {
             val managedBuffer = new NioByteBufferManagedBuffer(dataBuffer)
             val blockIterator = serializer.newInstance().deserializeStream(
@@ -46,7 +64,8 @@ private[spark] class CoflowBlockShuffleIterator(
           }
         }
       }
-      logInfo(s"start to fetch block[shuffle id = $shuffleId, map id = $mapId, reduce id = $reduceId] data.")
+      logInfo(s"start to fetch block[shuffle id = $shuffleId, " +
+        s"map id = $mapId, reduce id = $reduceId] data.")
       // submit task to fetch data and put it into blocks queue
       threadPool.submit(blockFetcher)
     })
