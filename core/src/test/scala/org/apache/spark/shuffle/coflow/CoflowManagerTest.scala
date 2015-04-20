@@ -17,7 +17,7 @@ class CoflowManagerTest extends FunSuite {
 
   test("local cluster") {
     System.setProperty("varys.client.data.locality", "false")
-    val coflowMaster = s"varys://${Utils.localIpAddress()}:1606"
+    val coflowMaster = s"varys://${Utils.localIpAddress}:1606"
     val conf = new SparkConf
     conf.setMaster("local[2]")
       .setAppName("coflow")

@@ -67,12 +67,16 @@ private[spark] class CoflowBlockShuffleIterator(
           s"map id = $mapId, reduce id = $reduceId] data.")
         val managedBuffer = new NioByteBufferManagedBuffer(dataBuffer)
         if (managedBuffer.size > 0) {
-          val blockIterator = serializer.newInstance().deserializeStream(
-            blockManager.wrapForCompression(ShuffleBlockId(shuffleId, mapId, reduceId),
-              managedBuffer.inputStream())).asIterator
-          blocks.put(blockIterator)
-          shuffleMetrics.remoteBlocksFetched += 1
-          shuffleMetrics.remoteBytesRead += managedBuffer.size
+          try {
+            val blockIterator = serializer.newInstance().deserializeStream(
+              blockManager.wrapForCompression(ShuffleBlockId(shuffleId, mapId, reduceId),
+                managedBuffer.inputStream())).asIterator
+            blocks.put(blockIterator)
+            shuffleMetrics.remoteBlocksFetched += 1
+            shuffleMetrics.remoteBytesRead += managedBuffer.size
+          } catch {
+            case e: Exception => logWarning("Error when flow complete", e)
+          }
         }
       }
     })
