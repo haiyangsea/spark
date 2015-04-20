@@ -52,12 +52,11 @@ private[spark] class CoflowBlockShuffleIterator(
     }
 
     coflowManager.getFlows(shuffleId, flowIds, new FlowFetchListener {
-      override def onFlowFetchFailure(
-        coflowId: String,
-        flowId: String,
-        length: Long,
-        exception: Throwable): Unit = {
-        logError(s"Failed fetch flow with id $flowId in coflow $coflowId")
+      override def onFlowFetchFailure(coflowId: String,
+                                      flowId: String,
+                                      length: Long,
+                                      exception: Throwable): Unit = {
+        logWarning(s"Failed fetch flow with id $flowId in coflow $coflowId", exception)
       }
 
       override def onFlowFetchSuccess(coflowId: String,
@@ -67,7 +66,7 @@ private[spark] class CoflowBlockShuffleIterator(
         logDebug(s"get block[shuffle id = $shuffleId, " +
           s"map id = $mapId, reduce id = $reduceId] data.")
         val managedBuffer = new NioByteBufferManagedBuffer(dataBuffer)
-        if(managedBuffer.size > 0) {
+        if (managedBuffer.size > 0) {
           val blockIterator = serializer.newInstance().deserializeStream(
             blockManager.wrapForCompression(ShuffleBlockId(shuffleId, mapId, reduceId),
               managedBuffer.inputStream())).asIterator
@@ -77,6 +76,7 @@ private[spark] class CoflowBlockShuffleIterator(
         }
       }
     })
+
   }
 
   def hasNext: Boolean = {

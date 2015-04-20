@@ -97,7 +97,7 @@ private[spark] object CoflowManager {
   }
 
   def getBlockId(flowId: String): ShuffleBlockId = {
-    val blockPatten = "shuffle_(\\d)_(\\d)_(\\d)".r
+    val blockPatten = """shuffle_(\d+)_(\d+)_(\d+)""".r
     flowId match {
       case blockPatten(shuffleId, mapId, reduceId) =>
         ShuffleBlockId(shuffleId.toInt, mapId.toInt, reduceId.toInt)
