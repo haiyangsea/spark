@@ -32,4 +32,21 @@ class CoflowManagerTest extends FunSuite {
     }
     result.foreach(println)
   }
+
+  test("larger data") {
+    System.setProperty("varys.client.data.locality", "false")
+    System.setProperty("varys.io.memoryMapThreshold", (1024 * 1024).toString)
+    val coflowMaster = s"varys://${Utils.localIpAddress}:1606"
+    val conf = new SparkConf
+    conf.setMaster("local[2]")
+      .setAppName("coflow")
+      .set("spark.coflow.master", coflowMaster)
+      .set("spark.shuffle.manager", "hash")
+      .set("spark.executor.memory", "512m")
+
+    val sc = new SparkContext(conf)
+    val file = getClass.getClassLoader.getResource("data.txt").getFile
+    val f = sc.textFile(file).map((_, 1)).groupByKey(1).count()
+    println(f)
+  }
 }

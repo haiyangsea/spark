@@ -55,6 +55,7 @@ class CoflowShuffleWriter[K, V](
       val blockId = ShuffleBlockId(handle.shuffleId, mapId, reduceId)
       val fileSegment: FileSegment = getFileSegment(blockId)
       val fileId: String = CoflowManager.makeFileId(blockId)
+      println(s"flow id $fileId, length = ${fileSegment.length}")
       coflowManager.putFile(handle.shuffleId, fileId, fileSegment, reduceCount)
     })
     mapStatus

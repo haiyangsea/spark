@@ -65,15 +65,22 @@ private[spark] class CoflowBlockShuffleIterator(
         val mapId = CoflowManager.getBlockId(flowId).mapId
         logDebug(s"get block[shuffle id = $shuffleId, " +
           s"map id = $mapId, reduce id = $reduceId] data.")
-        val managedBuffer = new NioByteBufferManagedBuffer(dataBuffer)
-        if (managedBuffer.size > 0) {
+//        val managedBuffer = new NioByteBufferManagedBuffer(dataBuffer)
+        // TODO : find another way
+        // for now, if dataBuffer is direct, it will throw snappy read problem
+        // so, we must copy data from heap off to head
+        val buffer = copy(dataBuffer)
+        val length = buffer.remaining()
+        if (length > 0) {
           try {
-            val blockIterator = serializer.newInstance().deserializeStream(
+            val result = serializer.newInstance().deserializeStream(
               blockManager.wrapForCompression(ShuffleBlockId(shuffleId, mapId, reduceId),
-                managedBuffer.inputStream())).asIterator
-            blocks.put(blockIterator)
+                new NioByteBufferManagedBuffer(buffer).inputStream())).asIterator
+
+            blocks.put(result)
             shuffleMetrics.remoteBlocksFetched += 1
-            shuffleMetrics.remoteBytesRead += managedBuffer.size
+            shuffleMetrics.remoteBytesRead += length
+
           } catch {
             case e: Exception => logWarning("Error when flow complete", e)
           }
@@ -81,6 +88,16 @@ private[spark] class CoflowBlockShuffleIterator(
       }
     })
 
+  }
+
+  def copy(buffer: ByteBuffer): ByteBuffer = {
+    if (buffer.isDirect) {
+      val ret = new Array[Byte](buffer.remaining())
+      buffer.get(ret)
+      ByteBuffer.wrap(ret)
+    } else {
+      buffer
+    }
   }
 
   def hasNext: Boolean = {
@@ -91,7 +108,6 @@ private[spark] class CoflowBlockShuffleIterator(
     numBlocksProcessed += 1
     logInfo("fetch shuffle[shuffle id = %d, reduce id = %d] block %d time(s), total %d."
       .format(shuffleId, reduceId, numBlocksProcessed, numBlocksToFetch))
-
     val startFetchWait = System.currentTimeMillis()
     val block = blocks.take()
     val stopFetchWait = System.currentTimeMillis()
