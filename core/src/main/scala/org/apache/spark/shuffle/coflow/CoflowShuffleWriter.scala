@@ -31,6 +31,7 @@ class CoflowShuffleWriter[K, V](
 
   /** Close this writer, passing along whether the map completed */
   override def stop(success: Boolean): Option[MapStatus] = {
+    val result = shuffleWriterHandler.stop(success)
     val reduceCount: Int = handle.dependency.partitioner.numPartitions
     // 在Coflow中注册Map/Reduce结果
     (0 until reduceCount).foreach(reduceId => {
@@ -39,6 +40,6 @@ class CoflowShuffleWriter[K, V](
       val fileId: String = CoflowManager.makeFileId(blockId)
       coflowManager.putFile(handle.shuffleId, fileId, fileSegment, reduceCount)
     })
-    shuffleWriterHandler.stop(success)
+    result
   }
 }

@@ -299,7 +299,7 @@
           </exclusion>
           <exclusion>
               <groupId>com.typesafe.akka</groupId>
-              <artifactId>akka-remote_2.10</artifactId>
+              <artifactId>akka-actor_2.10</artifactId>
           </exclusion>
           <exclusion>
               <groupId>com.typesafe.akka</groupId>
